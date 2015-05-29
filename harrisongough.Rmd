@@ -1,0 +1,226 @@
+---
+title: "Four phases in the work of Harrison Gough"
+author: "Kevin Lanning"
+date: "Tuesday, March 12, 2015"
+output: word_document
+---
+
+An application of differential text analysis to illustrate phases in the life of a single scholar, Harrison Gough.
+
+```{r Libraries and PDF-> text}
+library (tm)
+library (wordcloud)
+library(VennDiagram)
+library(slam)
+windowsFonts(
+  Segoe=windowsFont("Segoe UI"),
+  Corbel=windowsFont("Corbel"),
+  Cambria=windowsFont("Cambria"),
+  Candara=windowsFont("Candara"),
+  Times=windowsFont("Times New Roman"),
+  Trebuchet=windowsFont("Trebuchet")
+)
+# Colors are dark ends of Brewer palettes (light end too faint for my use)
+greys <- c( "#FFFFFF", "#F0F0F0" ,"#D9D9D9", "#BDBDBD" ,"#969696", "#737373", "#525252" ,"#252525","#000000")
+reds <- c("#FFF5F0","#FEE0D2","#FCBBA1","#FC9272","#FB6A4A","#EF3B2C","#CB181D","#A50F15","#67000D")
+oranges <- c("#FFF5EB","#FEE6CE","#FDD0A2","#FDAE6B" ,"#FD8D3C", "#F16913" ,"#D94801", "#A63603", "#7F2704")
+greens <- c("#F7FCF5","#E5F5E0","#C7E9C0","#A1D99B","#74C476","#41AB5D","#238B45","#006D2C","#00441B")
+blues <- c("#F7FBFF", "#DEEBF7", "#C6DBEF", "#9ECAE1" ,"#6BAED6", "#4292C6", "#2171B5","#08519C","#08306B")
+purples <- c("#FCFBFD" ,"#EFEDF5", "#DADAEB", "#BCBDDC", "#9E9AC8", "#807DBA","#6A51A3","#54278F","#3F007D")
+
+```
+
+```{r cleanText}
+
+cleanText <- function(inputDir) {
+        raw.Corpora <-list.dirs(inputDir)
+        for (dirname in raw.Corpora) {
+                docs <- Corpus(DirSource(dirname)) 
+                docs <- tm_map(docs, content_transformer(tolower)) 
+                outfile <- (basename(dirname)) 
+                toString <-content_transformer(function(x,from,to) gsub(from,to,x))
+                toSpace <- content_transformer(function(x,from) gsub(from, " ", x))
+                # compound phrases that should be retained as wholes, dropping internal punctuation
+                docs<-tm_map(docs, toString, "T\\.V\\.","tv")
+                docs<-tm_map(docs, toString, "T\\.v\\.","tv")
+                docs<-tm_map(docs, toString, "t\\.v\\.","tv")
+                docs<-tm_map(docs, toString, "I\\.E\\.","ie")
+                docs<-tm_map(docs, toString, "I\\.e\\.","ie")
+                docs<-tm_map(docs, toString, "i\\.e\\.","ie")
+                docs<-tm_map(docs, toString, "E\\.G\\.","eg")
+                docs<-tm_map(docs, toString, "E\\.g\\.","eg")
+                docs<-tm_map(docs, toString, "e\\.g\\.","eg")
+                # docs<-tm_map(docs, toString, "he\\/she","heshe")
+                # docs<-tm_map(docs, toString, "him\\/her","himher")
+                
+                # brackets and sic dropped because not typically part of respondent speech
+                docs<-tm_map(docs, toSpace, "\\[sic\\]")
+                docs<-tm_map(docs, toSpace, "[[]|[]]")
+        
+                # note that punctuation marks are related to Openness in work on tweets at Penn
+                # note that spaces are added before and after each to separate these from text
+                docs<-tm_map(docs, toString, "(1|2|3|4|5|6|7|8|9|0)"," [digit] ")
+                docs<-tm_map(docs, toString, "(\\.\\.\\.|\\. \\. \\.)","  [ellipsis] ")
+                docs<-tm_map(docs, toString, "\\."," [period] ")
+                docs<-tm_map(docs, toString, "\\?"," [questionmark] ")
+                docs<-tm_map(docs, toString, "!"," [exclamationpoint] ")
+                docs<-tm_map(docs, toString, "\\,"," [comma] ")
+                docs<-tm_map(docs, toString, ";"," [semicolon] ")
+                docs<-tm_map(docs, toString, ":"," [colon] ")
+                docs<-tm_map(docs, toString, "\\(|)"," [parenthesis] ")
+                docs<-tm_map(docs, toString, "\""," [quotationmark] ")
+                docs<-tm_map(docs, toString, "@"," [at] ")
+                docs<-tm_map(docs, toString, "#"," [hashtag] ")
+                docs<-tm_map(docs, toString, "&"," [ampersand] ")
+                docs<-tm_map(docs, toString, "%"," [percent] ")
+                docs<-tm_map(docs, toString, "\\$"," [dollars] ")
+                docs<-tm_map(docs, toString, "\\\\"," [backslash] ")
+                docs<-tm_map(docs, toString, "\\|"," [pipe] ")
+                docs<-tm_map(docs, toString, ">"," [greaterthan] ")
+                docs<-tm_map(docs, toString, "<"," [lessthan] ")
+                docs<-tm_map(docs, toString, "\\+"," [plus] ")
+                docs<-tm_map(docs, toString, "="," [equal] ")
+                docs<-tm_map(docs, toString, "\\^"," [caret] ")
+                docs<-tm_map(docs, toString, "\\*"," [asterisk] ")
+                # for single quote, change if preceded or followed by space else retain as apostrophe
+                docs<-tm_map(docs, toString, " \\'"," [singlequote] ")
+                docs<-tm_map(docs, toString, "\\' "," [singlequote] ")
+                docs<-tm_map(docs, toString, " \\`"," [singlequote] ")
+                docs<-tm_map(docs, toString, "\\` "," [singlequote] ")
+                # for dash & slash, change if preceded/followed by space else keep as compound-word
+                docs<-tm_map(docs, toString, "\\- "," [dash] ")
+                docs<-tm_map(docs, toString, " \\-"," [dash] ")
+                # for slash, change only when preceded and followed by space
+                docs<-tm_map(docs, toString, " /"," [slash] ")
+                docs<-tm_map(docs, toString, "/ "," [slash] ")
+
+                docs<-tm_map(docs, stripWhitespace)
+                # keep even 1 letter words
+                ctrl <- list(wordLengths = c(1, 50)) 
+                docs <-termFreq(docs[[1]], control = ctrl) 
+                cleanedText <<- as.data.frame(docs) 
+                }
+        }
+
+```
+There are four separate corpora here, each corresponding to a separate community.  Each corpora is set up as a separate directory.
+
+```{r Cleaning and combining}
+
+text1 <- "C:/Users/the/Dropbox/2 Social Psych structure/Gough/1940s1950s"
+text2 <- "C:/Users/the/Dropbox/2 Social Psych structure/Gough/1960s"
+text3 <- "C:/Users/the/Dropbox/2 Social Psych structure/Gough/1970s"
+text4 <- "C:/Users/the/Dropbox/2 Social Psych structure/Gough/1980s1990s"
+
+cleanText(text1)
+text40s50s <-cleanedText
+cleanText(text2)
+text60s <-cleanedText
+cleanText(text3)
+text70s <-cleanedText
+cleanText(text4)
+text80s90s <-cleanedText
+
+options(warn = -1)
+a <- text40s50s
+b <- text60s
+res <- Reduce(function(a,b){
+        ans <- merge(a,b,by="row.names",all=T)
+        row.names(ans) <- ans[,"Row.names"]
+        ans[,!names(ans) %in% "Row.names"]
+        }, list(text40s50s,text60s))
+a <- res
+b <- text70s
+res <- Reduce(function(a,b){
+        ans <- merge(a,b,by="row.names",all=T)
+        row.names(ans) <- ans[,"Row.names"]
+        ans[,!names(ans) %in% "Row.names"]
+        }, list(text40s50s,text60s, text70s))
+a <- res
+b <- text80s90s
+allfreq <- Reduce(function(a,b){
+        ans <- merge(a,b,by="row.names",all=T)
+        row.names(ans) <- ans[,"Row.names"]
+        ans[,!names(ans) %in% "Row.names"]
+        }, list(text40s50s,text60s, text70s, text80s90s))
+names(allfreq) <- c("text40s50s","text60s","text70s","text80s90s")
+rm(a,b,res)
+options(warn = 0)
+
+```
+
+The files are combined into six summary files: A single matrix of frequencies (allfreq), then a second with proportions(allpct), each based on all terms.  Then two additional files, each based on words which appear at least n times in the whole corpus.  Finally, two files which center along both rows and columns: These provide the differential words.
+
+```{r Extraction of files into single matrices of frequencies and proportions}
+
+# Threshold for inclusion in database (minimum number of times word appears)
+minf <- 5
+
+allfreq[is.na(allfreq)] <- 0
+
+allfreqm <- addmargins(as.matrix(allfreq))
+allfreqm <- as.data.frame(allfreqm)
+options (warn = -1)
+attach(allfreqm)
+options (warn = 0)
+mostfreqm <- subset(allfreqm, Sum >= minf)
+nrw <-nrow(mostfreqm)-1
+ncm <-ncol(mostfreqm)-1
+mostfreq <- mostfreqm[1:nrw,1:ncm] # remove the column and row sums I just added
+# words as percentages within corpora (columns)
+allpct<-prop.table(as.matrix(allfreq), 2)
+mostpct<-prop.table(as.matrix(mostfreq), 2)
+
+rm(allfreqm,mostfreqm)
+# now percentages within rows
+allrfreq <- prop.table(as.matrix(allpct),1)
+mostrfreq <- prop.table(as.matrix(mostpct),1)
+
+write.csv(allfreq,    "allfreq.csv")
+write.csv(mostfreq,   "mostfreq.csv")
+write.csv(allpct,     "allpct.csv")
+write.csv(mostpct,    "mostpct.csv")
+write.csv(allrfreq, "allrfreq.csv")
+write.csv(mostrfreq,"mostrfreq.csv")
+# note that in Excel I then dropped words that appeared in only one 'era', punctution marks, first names, typos
+```
+## Distinguishing language at each phase ##
+
+I then constructed wordclouds to describe the unique content of each of the four phases.  This was done by extracting the words whose frequency of use was great at a particular level relative to all other levels (mostrfreq):
+
+
+```{r}
+
+most <- read.csv("mostrfreq.csv")
+
+set.seed(92134)
+par(bg=greys[1], family="Segoe",mar=rep(1,4))
+#layout(matrix(c(1, 2), nrow=2), heights=c(1.5,4))
+layout(matrix(c(1, 1), nrow=1), heights=c(1.5,6))
+plot.new()
+text(x=0.5, y=0.5, "Gough in 1940s and 1950s",cex = 1.25)
+wordcloud(most[,1],most[,2], scale = c(1,.05), max.words = 100,colors = reds[c(4,6,8)],rot.per = .2)
+
+set.seed(92134)
+par(bg=greys[1], family="Segoe",mar=rep(1,4))
+#layout(matrix(c(1, 2), nrow=2), heights=c(1.5,4))
+plot.new()
+text(x=0.5, y=0.5, "Gough in 1960s",cex = 1.25)
+wordcloud(most[,1],most[,3], scale = c(1,.05), max.words = 100,colors = oranges[c(4,6,8)],rot.per = .2)
+
+set.seed(92134)
+par(bg=greys[1], family="Segoe",mar=rep(1,4))
+#layout(matrix(c(1, 2), nrow=2), heights=c(1.5,4))
+plot.new()
+text(x=0.5, y=0.5, "Gough in 1970s",cex = 1.25)
+wordcloud(most[,1],most[,4], scale = c(1,.05), max.words = 100,colors = greens[c(4,6,8)],rot.per = .2)
+
+set.seed(92134)
+par(bg=greys[1], family="Segoe",mar=rep(1,4))
+#layout(matrix(c(1, 2), nrow=2), heights=c(1.5,4))
+plot.new()
+text(x=0.5, y=0.5, "Gough in 1980s and 1990s",cex = 1.25)
+wordcloud(most[,1],most[,5], scale = c(1,.05), max.words = 100,colors = blues[c(4,6,8)],rot.per = .2)
+
+```
+
